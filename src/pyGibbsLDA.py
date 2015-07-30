@@ -112,7 +112,7 @@ class Sampler(object):
                 ph[z][w] = (self.cntTW[z][w] + self.beta) / (self.cntT[z] + self.beta * self.VOCABS)
         return ph, th
         
-    def kernel(self, nsamples, burnin, interval):                   # GIBBS SAMPLER KERNEL
+    def run(self, nsamples, burnin, interval):                   # GIBBS SAMPLER KERNEL
         if nsamples <= burnin:                                      # BURNIN CHECK
             print("ERROR: BURN-IN POINT EXCEEDS THE NUMBER OF SAMPLES")
             sys.exit(0)
