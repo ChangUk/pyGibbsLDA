@@ -20,10 +20,8 @@ class Sampler(object):
         self.indV = {}                                              # MAP WORD INTO INDEX: self.indV = {VocabID: INDEX}
         self.DOCS = 0                                               # NUMBER OF DOCUMENTS
         self.VOCABS = 0                                             # NUMBER OF VOCABULARIES
-        self.alpha = np.ones(self.TOPICS)
-        for i in range(self.TOPICS):
-            self.alpha[i] *= 0.01                                   # np.random.gamma(0.1, 1)
-        self.beta = 0.01                                            # np.random.gamma(0.1, 1)
+        self.alpha = np.random.gamma(0.1, 1)                        # HYPER-PARAMETER ALPHA
+        self.beta = np.random.gamma(0.1, 1)                         # HYPER-PARAMETER BETA
         data = open(pathData, "r")
         [self.LoadData(r) for r in data.read().split("\n")]         # LOAD TRAINING DATA INTO 'self.documents'
         for doc in self.documents:
@@ -48,7 +46,7 @@ class Sampler(object):
                 if not r[1] in self.indV:                           # ADD WORD
                     self.indV[r[1]] = self.VOCABS
                     self.VOCABS += 1
-                    
+
     def assignTopics(self, doc, word, pos):                         # DROW TOPIC SAMPLE FROM FULL-CONDITIONAL DISTRIBUTION
         d = self.indD[doc]
         w = self.indV[word]
@@ -59,7 +57,7 @@ class Sampler(object):
         self.lenD[d] -= 1
         
         # FULL-CONDITIONAL DISTRIBUTION
-        prL = (self.cntDT[d] + self.alpha) / (self.lenD[d] + np.sum(self.alpha))
+        prL = (self.cntDT[d] + self.alpha) / (self.lenD[d] + self.alpha * self.TOPICS)
         prR = (self.cntTW[:,w] + self.beta) / (self.cntT + self.beta * self.VOCABS)
         prFullCond = prL * prR                                      # FULL-CONDITIONAL DISTRIBUTION
         prFullCond /= np.sum(prFullCond)                            # TO OBTAIN PROBABILITY
@@ -70,7 +68,7 @@ class Sampler(object):
         self.cntDT[d, new_z] += 1
         self.cntT[new_z] += 1
         self.lenD[d] += 1
-        
+
     def LogLikelihood(self):                                        # FIND (JOINT) LOG-LIKELIHOOD VALUE
         l = 0
         for z in range(self.TOPICS):                                # log p(w|z,\beta)
@@ -80,40 +78,40 @@ class Sampler(object):
             l -= gammaln(np.sum(self.cntTW[z] + self.beta))
         for doc in self.documents:                                  # log p(z|\alpha)
             d = self.indD[doc]
-            l += gammaln(np.sum(self.alpha))
-            l -= np.sum(gammaln(self.alpha))
+            l += gammaln(self.TOPICS * self.alpha)
+            l -= self.TOPICS * gammaln(self.alpha)
             l += np.sum(gammaln(self.cntDT[d] + self.alpha))
             l -= gammaln(np.sum(self.cntDT[d] + self.alpha))
         return l
-        
+
     def findAlphaBeta(self):
         # ADJUST ALPHA AND BETA BY USING MINKA'S FIXED-POINT ITERATION
         numerator = 0
         denominator = 0
         for d in range(self.DOCS):
-            numerator += psi(self.cntDT[d] + self.alpha) - psi(self.alpha)
-            denominator += psi(np.sum(self.cntDT[d] + self.alpha)) - psi(np.sum(self.alpha))
-        self.alpha *= numerator / denominator                                   # UPDATE ALPHA
+            numerator += np.sum(psi(self.cntDT[d] + self.alpha) - psi(self.alpha))
+            denominator += psi(np.sum(self.cntDT[d] + self.alpha)) - psi(self.TOPICS * self.alpha)
+        self.alpha = (self.alpha * numerator) / (self.TOPICS * denominator)     # UPDATE ALPHA
         numerator = 0
         denominator = 0
         for z in range(self.TOPICS):
             numerator += np.sum(psi(self.cntTW[z] + self.beta) - psi(self.beta))
             denominator += psi(np.sum(self.cntTW[z] + self.beta)) - psi(self.VOCABS * self.beta)
         self.beta = (self.beta * numerator) / (self.VOCABS * denominator)       # UPDATE BETA
-        
-    def findThetaPhi(self):
-        th = np.zeros((self.DOCS, self.TOPICS))                     # SPACE FOR THETA
+
+    def findPhiTheta(self):
         ph = np.zeros((self.TOPICS, self.VOCABS))                   # SPACE FOR PHI
-        for d in range(self.DOCS):
-            for z in range(self.TOPICS):
-                th[d][z] = (self.cntDT[d][z] + self.alpha[z]) / (self.lenD[d] + np.sum(self.alpha))
+        th = np.zeros((self.DOCS, self.TOPICS))                     # SPACE FOR THETA
         for z in range(self.TOPICS):
             for w in range(self.VOCABS):
                 ph[z][w] = (self.cntTW[z][w] + self.beta) / (self.cntT[z] + self.beta * self.VOCABS)
+        for d in range(self.DOCS):
+            for z in range(self.TOPICS):
+                th[d][z] = (self.cntDT[d][z] + self.alpha) / (self.lenD[d] + self.alpha * self.TOPICS)
         return ph, th
-        
-    def kernel(self, nsamples, burnin, interval):                   # GIBBS SAMPLER KERNEL
-        if nsamples <= burnin:                                      # BURNIN CHECK
+
+    def run(self, nsamples, burnin, interval):                      # GIBBS SAMPLER KERNEL
+        if(nsamples <= burnin):                                     # BURNIN CHECK
             print("ERROR: BURN-IN POINT EXCEEDS THE NUMBER OF SAMPLES")
             sys.exit(0)
         print("# of DOCS:", self.DOCS)                              # PRINT TRAINING DATA INFORMATION
@@ -144,11 +142,8 @@ class Sampler(object):
                 
         # COLLAPSED GIBBS SAMPLING
         print("INITIAL STATE")
-        print("\tLikelihood:", self.LogLikelihood())               # FIND (JOINT) LOG-LIKELIHOOD
-        print("\tAlpha:", end="")
-        for i in range(self.TOPICS):
-            print(" %.5f" % self.alpha[i], end="")
-        print("\n\tBeta: %.5f" % self.beta)
+        print("\tAlpha Beta:", self.alpha, self.beta)
+        print("\tLikelihood:", self.LogLikelihood())                # FIND (JOINT) LOG-LIKELIHOOD
         SAMPLES = 0
         for s in range(nsamples):
             for doc in self.documents:
@@ -157,16 +152,13 @@ class Sampler(object):
             self.findAlphaBeta()                                    # UPDATE ALPHA AND BETA VALUES
             lik = self.LogLikelihood()
             print("SAMPLE #" + str(s))
-            print("\tLikelihood:", lik)
-            print("\tAlpha:", end="")
-            for i in range(self.TOPICS):
-                print(" %.5f" % self.alpha[i], end="")
-            print("\n\tBeta: %.5f" % self.beta)
+            print("\tAlpha Beta:", self.alpha, self.beta)
+            print("\tLikelihood:", lik)                             # FIND LOG-LIKELIHOOD AGAIN
             if s > burnin and s % interval == 0:                    # FIND PHI AND THETA AFTER BURN-IN POINT
-                ph, th = self.findThetaPhi()
-                self.theta += th
+                ph, th = self.findPhiTheta()
                 self.phi += ph
+                self.theta += th
                 SAMPLES += 1
-        self.theta /= SAMPLES                                       # AVERAGING GIBBS SAMPLES OF THETA
         self.phi /= SAMPLES                                         # AVERAGING GIBBS SAMPLES OF PHI
+        self.theta /= SAMPLES                                       # AVERAGING GIBBS SAMPLES OF THETA
         return lik
