@@ -1,11 +1,11 @@
 # pyGibbsLDA
 Python Implementation of Collapsed Gibbs Sampling for Latent Dirichlet Allocation (LDA)
 
-# Develop environment
+## Develop environment
 Language: Python3
 Prerequisite libraries: [Scipy](http://scipy.org), [Numpy](http://numpy.org), [matplotlib](http://matplotlib.org)
 
-# Input data format
+## Input data format
 DocumentID \t WordID \t Count \n
 
 ## Module usage example
