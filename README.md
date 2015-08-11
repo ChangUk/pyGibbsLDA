@@ -16,8 +16,9 @@ DocumentID \t WordID \t Count \n
 ```
 * 100: # of topics
 * 500: # of Gibbs samples
-* 300: # of burnin point
+* 300: burn-in point
 * 2: sampling interval
 
 ## Reference
+* [http://www.cs.columbia.edu/~blei/papers/BleiNgJordan2003.pdf](http://www.cs.columbia.edu/~blei/papers/BleiNgJordan2003.pdf)
 * [http://parkcu.com/blog/gibbs-sampling-for-topic-models](http://parkcu.com/blog/gibbs-sampling-for-topic-models)
