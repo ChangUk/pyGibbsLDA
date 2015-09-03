@@ -10,8 +10,8 @@ DocumentID \t WordID \t Count \n
 
 ## Module usage example
 ```python
->>> import pyGibbsLDA
->>> sampler = pyGibbsLDA.Sampler("/home2/TwitterData.dat", 100)
+>>> import GibbsLDA
+>>> sampler = GibbsLDA.Sampler("/home2/TwitterData.dat", 100)
 >>> likelihood = sampler.run(500, 300, 2)
 ```
 * 100: # of topics
